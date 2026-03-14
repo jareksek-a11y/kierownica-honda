@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Symulator Honda Pro Max v4.0</title>
+    <style>
+        :root {
+            --wheel-color: #080808; 
+            --accent-color: #4CAF50;
+            --danger-color: #f44336;
+            --warning-color: #ff9800;
+            --text-color: #fff;
+            --bg-0: #0a0a0a; --bg-1: #222222; --bg-2: #7a7a7a; --bg-3: #ffffff;
+            --color-wipers: #2196F3;
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: var(--bg-0); color: var(--text-color);
+            font-family: sans-serif; overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+            transition: background-color 0.4s ease;
+        }
+
+        #dashboard { position: relative; width: 100vw; height: 100vh; z-index: 10; pointer-events: none; }
+        #dashboard * { pointer-events: auto; }
+
+        #wiper-blade {
+            position: absolute; bottom: -50px; left: 50%;
+            width: 16px; height: 150vh; 
+            background: rgba(0, 0, 0, 0.6);
+            transform-origin: bottom center;
+            transform: rotate(-90deg);
+            z-index: 5; display: none; pointer-events: none;
+            border-radius: 8px;
+        }
+
+        .droplet {
+            position: absolute; background: rgba(173, 216, 230, 0.5);
+            border-radius: 50%; pointer-events: none; z-index: 1;
+        }
+
+        /* KIEROWNICA NA WYSOKOŚCI 42% */
+        #wheel-container { 
+            position: absolute; 
+            top: 42%; 
+            left: 50%; 
+            width: 62vmin; 
+            height: 62vmin; 
+            transform: translate(-50%, -50%); 
+            touch-action: none; 
+        }
+
+        #steering-wheel {
+            width: 100%; height: 100%; border-radius: 50%;
+            border: 4.5vmin solid var(--wheel-color);
+            background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 100%);
+            position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.7), inset 0 5px 15px rgba(0,0,0,0.8);
+            display: flex; justify-content: center; align-items: center;
+        }
+        #steering-wheel::before, #steering-wheel::after { content: ''; position: absolute; background-color: var(--wheel-color); }
+        #steering-wheel::before { width: 100%; height: 4.5vmin; top: 50%; transform: translateY(-50%); }
+        #steering-wheel::after { width: 4.5vmin; height: 50%; bottom: 0; left: 50%; transform: translateX(-50%); }
+
+        .control-btn {
+            position: absolute; background-color: #333; color: white;
+            border: none; border-radius: 15px; padding: 2vmin 4vmin;
+            font-size: 5vmin; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .switch-panel {
+            position: absolute; top: 15%; display: flex; flex-direction: column;
+            align-items: center; gap: 2vmin; background-color: #2a2a2a;
+            padding: 2vmin; border-radius: 15px; border: 1px solid #444; min-width: 16vmin;
+        }
+        #lights-panel { left: 5%; }
+        #wipers-panel { right: 5%; }
+
+        .icons-list { display: flex; flex-direction: column; gap: 2vmin; width: 100%; align-items: center; }
+        .l-icon, .w-icon {
+            opacity: 0.3; color: #888; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            width: 9vmin; height: 7vmin; background: #222; border-radius: 10px; transition: all 0.2s;
+            font-weight: bold; font-size: 3.5vmin;
+        }
+
+        .active-icon { opacity: 1 !important; background: #111 !important; }
+        .w-icon.active-icon { color: var(--color-wipers); box-shadow: 0 0 10px var(--color-wipers); }
+        #icon-l-3.active-icon { color: #2196F3; box-shadow: 0 0 10px #2196F3; }
+        #icon-l-2.active-icon, #icon-l-1.active-icon { color: #4CAF50; box-shadow: 0 0 10px #4CAF50; }
+        .active-icon[data-level="0"] { color: #fff !important; background: #444 !important; }
+
+        /* KLAKSON Z LOGO REFERENCYJNYM */
+        #horn-btn { 
+            position: relative; width: 24vmin; height: 24vmin; 
+            background-color: #151515; border-radius: 50%; z-index: 10; 
+            display: flex; justify-content: center; align-items: center; 
+            border: 0.6vmin solid #111; cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.9);
+        }
+
+        .honda-logo-ref {
+            width: 80%;
+            height: 80%;
+            background-color: white; /* To nadaje kolor logo */
+            mask: url('honda-svgrepo-com.svg') no-repeat center;
+            -webkit-mask: url('honda-svgrepo-com.svg') no-repeat center;
+            mask-size: contain;
+            -webkit-mask-size: contain;
+        }
+
+        /* KIERUNKOWSKAZY */
+        #left-signal { bottom: 5%; left: 5%; }
+        #right-signal { bottom: 5%; right: 5%; }
+        .blinking { animation: blinker 1.2s linear infinite; }
+        @keyframes blinker { 50% { background-color: var(--warning-color); color: black; } }
+
+        /* AWARYJNE (NAPRAWIONE MIGANIE PRZYCISKU) */
+        #hazard-btn { bottom: 5%; left: 50%; transform: translateX(-50%); background-color: #551111; color: var(--danger-color); }
+        .blinking-hazard { animation: hazard-blinker 1.2s linear infinite !important; }
+        @keyframes hazard-blinker { 50% { background-color: var(--danger-color); color: white; } }
+
+        #engine-btn { bottom: 5%; left: 72.5%; transform: translateX(-50%); width: 15vmin; height: 15vmin; border-radius: 50%; background-color: #880000; font-size: 2.2vmin; font-weight: bold; }
+        #engine-btn.engine-on { background-color: #008800; }
+        #wash-btn:disabled { opacity: 0.3; }
+    </style>
+</head>
+<body>
+
+    <div id="wiper-blade"></div>
+
+    <div id="dashboard">
+        <div id="lights-panel" class="switch-panel">
+            <button id="flash-btn" class="control-btn" style="position:static; width:100%; font-size:2.5vmin; padding:1.5vmin; font-weight:bold;">MIG</button>
+            <div class="icons-list">
+                <div class="l-icon" data-level="3" id="icon-l-3"><svg viewBox="0 0 24 24" width="100%" fill="currentColor"><path d="M12 6 C 18 6, 20 9, 20 12 C 20 15, 18 18, 12 18 Z"/><line x1="4" y1="8" x2="10" y2="8" stroke="currentColor" stroke-width="2"/><line x1="4" y1="12" x2="10" y2="12" stroke="currentColor" stroke-width="2"/><line x1="4" y1="16" x2="10" y2="16" stroke="currentColor" stroke-width="2"/></svg></div>
+                <div class="l-icon" data-level="2" id="icon-l-2"><svg viewBox="0 0 24 24" width="100%" fill="currentColor"><path d="M12 6 C 18 6, 20 9, 20 12 C 20 15, 18 18, 12 18 Z"/><line x1="4" y1="12" x2="10" y2="8" stroke="currentColor" stroke-width="2"/><line x1="4" y1="16" x2="10" y2="12" stroke="currentColor" stroke-width="2"/><line x1="4" y1="20" x2="10" y2="16" stroke="currentColor" stroke-width="2"/></svg></div>
+                <div class="l-icon" data-level="1" id="icon-l-1"><svg viewBox="0 0 24 24" width="100%" fill="currentColor"><path d="M10 8 C 7 8, 6 10, 6 12 C 6 14, 7 16, 10 16 Z"/><line x1="2" y1="12" x2="5" y2="12" stroke="currentColor" stroke-width="2"/><path d="M14 8 C 17 8, 18 10, 18 12 C 18 14, 17 16, 14 16 Z"/><line x1="22" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2"/></svg></div>
+                <div class="l-icon active-icon" data-level="0" id="icon-l-0">0</div>
+            </div>
+        </div>
+
+        <div id="wipers-panel" class="switch-panel">
+            <button id="wash-btn" class="control-btn" style="position:static; width:100%; font-size:2.5vmin; padding:1.5vmin; font-weight:bold;">🚿</button>
+            <div class="icons-list">
+                <div class="w-icon" data-level="3" id="icon-w-3">3</div>
+                <div class="w-icon" data-level="2" id="icon-w-2">2</div>
+                <div class="w-icon" data-level="1" id="icon-w-1">1</div>
+                <div class="w-icon active-icon" data-level="0" id="icon-w-0">0</div>
+            </div>
+        </div>
+
+        <div id="wheel-container">
+            <div id="steering-wheel">
+                <div id="horn-btn">
+                    <div class="honda-logo-ref"></div>
+                </div>
+            </div>
+        </div>
+
+        <button id="left-signal" class="control-btn"><svg viewBox="0 0 24 24" width="6vmin" fill="white"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg></button>
+        <button id="hazard-btn" class="control-btn">⚠</button>
+        <button id="engine-btn" class="control-btn engine-on">START<br>ENGINE</button>
+        <button id="right-signal" class="control-btn"><svg viewBox="0 0 24 24" width="6vmin" fill="white"><path d="M4 11h12.17l-5.59-5.59L12 4l8 8-8 8-1.41-1.41L16.17 13H4v-2z"/></svg></button>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration, vol = 0.1) {
+            if (audioCtx.state === 'suspended') return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
+        }
+
+        let blinkTick;
+        function startBlinkerSound() {
+            if (blinkTick) return;
+            blinkTick = setInterval(() => {
+                playTone(880, 'sine', 0.1, 0.05);
+                setTimeout(() => playTone(440, 'sine', 0.1, 0.03), 600);
+            }, 1200);
+        }
+        function stopBlinkerSound() { clearInterval(blinkTick); blinkTick = null; }
+
+        // --- KLIKNIĘCIE MANETKI (WYŁĄCZENIE) ---
+        function playStalkClick() {
+            playTone(300, 'square', 0.05, 0.05);
+        }
+
+        const wiperBlade = document.getElementById('wiper-blade');
+        const washBtn = document.getElementById('wash-btn');
+        const flashBtn = document.getElementById('flash-btn');
+        let wiperLevel = 0, wiperInterval, currentWiperAngle = -90;
+        let droplets = [], currentLvl = 0;
+
+        // --- SPRYSKIWACZ ---
+        washBtn.addEventListener('click', () => {
+            if (washBtn.disabled) return;
+            playTone(400, 'triangle', 0.5, 0.05);
+            washBtn.disabled = true;
+            setTimeout(() => washBtn.disabled = false, 2000);
+
+            for(let i=0; i<750; i++){
+                const drop = document.createElement('div');
+                drop.className = 'droplet';
+                const size = Math.random() * 5 + 2;
+                const x = Math.random() * 100;
+                const y = Math.random() * 100;
+                drop.style.width = size + 'px'; drop.style.height = size + 'px';
+                drop.style.left = x + 'vw'; drop.style.top = y + 'vh';
+                document.body.appendChild(drop);
+                droplets.push({ el: drop, x: (x/100)*window.innerWidth, y: (y/100)*window.innerHeight });
+            }
+            if (wiperLevel === 0) runSingleWipe();
+        });
+
+        // --- ŚCIERANIE ---
+        function checkCollisions(angle) {
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight + 50;
+            const wiperRad = angle * (Math.PI / 180);
+            const threshold = 0.28; 
+
+            droplets = droplets.filter(drop => {
+                const dx = drop.x - centerX;
+                const dy = centerY - drop.y;
+                const dropAngle = Math.atan2(dx, dy);
+                if (Math.abs(dropAngle - wiperRad) < threshold) {
+                    drop.el.remove();
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function animateWiper(targetAngle, duration, callback) {
+            const startAngle = currentWiperAngle;
+            const startTime = performance.now();
+            function step(now) {
+                const progress = Math.min((now - startTime) / duration, 1);
+                currentWiperAngle = startAngle + (targetAngle - startAngle) * progress;
+                wiperBlade.style.transform = `rotate(${currentWiperAngle}deg)`;
+                checkCollisions(currentWiperAngle);
+                if (progress < 1) requestAnimationFrame(step);
+                else if (callback) callback();
+            }
+            requestAnimationFrame(step);
+        }
+
+        function runSingleWipe() {
+            wiperBlade.style.display = 'block';
+            animateWiper(90, 800, () => {
+                animateWiper(-90, 800, () => { if(wiperLevel === 0) wiperBlade.style.display = 'none'; });
+            });
+        }
+
+        function setW(w) {
+            wiperLevel = parseInt(w);
+            document.querySelectorAll('.w-icon').forEach(i => i.classList.remove('active-icon'));
+            document.getElementById('icon-w-' + w).classList.add('active-icon');
+            clearInterval(wiperInterval);
+            if (wiperLevel > 0) {
+                wiperBlade.style.display = 'block';
+                const speeds = [0, 1000, 600, 300], speed = speeds[wiperLevel];
+                const cycle = () => animateWiper(90, speed, () => animateWiper(-90, speed));
+                cycle(); wiperInterval = setInterval(cycle, speed * 2.2);
+            }
+        }
+        document.querySelectorAll('.w-icon').forEach(icon => icon.addEventListener('click', () => setW(icon.getAttribute('data-level'))));
+
+        // --- ŚWIATŁA ---
+        function setL(l) {
+            currentLvl = parseInt(l);
+            document.querySelectorAll('.l-icon').forEach(i => i.classList.remove('active-icon'));
+            document.getElementById('icon-l-' + l).classList.add('active-icon');
+            document.body.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(`--bg-${l}`);
+        }
+        document.querySelectorAll('.l-icon').forEach(icon => icon.addEventListener('click', () => setL(icon.getAttribute('data-level'))));
+
+        flashBtn.addEventListener('pointerdown', () => {
+            document.body.style.backgroundColor = 'var(--bg-3)';
+            document.getElementById('icon-l-3').classList.add('active-icon');
+        });
+        flashBtn.addEventListener('pointerup', () => setL(currentLvl));
+
+        // --- KIEROWNICA I SYSTEMY ---
+        const wheel = document.getElementById('wheel-container'), swheel = document.getElementById('steering-wheel');
+        let isDragging = false, currentRot = 0, startA = 0, blinkMode = 'off', hazardOn = false;
+
+        wheel.addEventListener('pointerdown', e => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (e.target.closest('#horn-btn')) return;
+            isDragging = true;
+            const rect = wheel.getBoundingClientRect();
+            startA = Math.atan2(e.clientY - (rect.top + rect.height/2), e.clientX - (rect.left + rect.width/2)) * (180 / Math.PI);
+        });
+
+        window.addEventListener('pointermove', e => {
+            if (!isDragging) return;
+            const rect = wheel.getBoundingClientRect();
+            const center = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+            let currentA = Math.atan2(e.clientY - center.y, e.clientX - center.x) * (180 / Math.PI);
+            let delta = currentA - startA;
+            if (delta > 180) delta -= 360; if (delta < -180) delta += 360;
+            
+            // Odbijanie kierunkowskazu z dźwiękiem kliknięcia
+            if (!hazardOn) {
+                if (delta < -1 && blinkMode === 'right') { 
+                    blinkMode = 'off'; updateBlinkers(); playStalkClick();
+                }
+                if (delta > 1 && blinkMode === 'left') { 
+                    blinkMode = 'off'; updateBlinkers(); playStalkClick();
+                }
+            }
+
+            currentRot += delta; swheel.style.transform = `rotate(${currentRot}deg)`;
+            startA = currentA;
+        });
+        window.addEventListener('pointerup', () => isDragging = false);
+
+        // --- KLAKSON ---
+        const horn = document.getElementById('horn-btn');
+        let h1, h2;
+        horn.addEventListener('pointerdown', () => {
+            h1 = audioCtx.createOscillator(); h2 = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            h1.frequency.value = 370; h2.frequency.value = 415; h1.type = h2.type = 'sawtooth';
+            g.gain.value = 0.1; h1.connect(g); h2.connect(g); g.connect(audioCtx.destination);
+            h1.start(); h2.start();
+        });
+        horn.addEventListener('pointerup', () => { if(h1){h1.stop(); h2.stop();} });
+
+        // --- KIERUNKOWSKAZY I AWARYJNE ---
+        const lSig = document.getElementById('left-signal'), rSig = document.getElementById('right-signal'), haz = document.getElementById('hazard-btn');
+        function updateBlinkers() {
+            lSig.classList.remove('blinking'); 
+            rSig.classList.remove('blinking'); 
+            haz.classList.remove('blinking-hazard');
+            
+            if (hazardOn) {
+                lSig.classList.add('blinking'); 
+                rSig.classList.add('blinking'); 
+                haz.classList.add('blinking-hazard');
+                startBlinkerSound();
+            } else if (blinkMode !== 'off') {
+                document.getElementById(blinkMode + '-signal').classList.add('blinking');
+                startBlinkerSound();
+            } else { 
+                stopBlinkerSound(); 
+            }
+        }
+        lSig.addEventListener('click', () => { 
+            if(!hazardOn) { 
+                if(blinkMode === 'left') { blinkMode = 'off'; playStalkClick(); }
+                else blinkMode = 'left';
+                updateBlinkers(); 
+            }
+        });
+        rSig.addEventListener('click', () => { 
+            if(!hazardOn) { 
+                if(blinkMode === 'right') { blinkMode = 'off'; playStalkClick(); }
+                else blinkMode = 'right';
+                updateBlinkers(); 
+            }
+        });
+        haz.addEventListener('click', () => {
+            if (!hazardOn && blinkMode !== 'off') {
+                blinkMode = 'off'; 
+                updateBlinkers();
+                playStalkClick();
+                setTimeout(() => { hazardOn = true; updateBlinkers(); }, 150);
+            } else { 
+                hazardOn = !hazardOn; 
+                updateBlinkers(); 
+            }
+        });
+
+        document.getElementById('engine-btn').addEventListener('click', function() {
+            this.classList.toggle('engine-on');
+            playTone(this.classList.contains('engine-on') ? 100 : 200, 'sawtooth', 1, 0.1);
+        });
+    </script>
+</body>
+</html>
